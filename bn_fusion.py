@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-def fuse_bn_sequential(block):
+def fuse_bn_sequential(block, is_cpu=False):
     """
     This function takes a sequential block and fuses the batch normalization with convolution
 
@@ -27,14 +27,18 @@ def fuse_bn_sequential(block):
                 if 'bias' in bn_st_dict:
                     beta = bn_st_dict['bias']
                 else:
-                    beta = torch.zeros(gamma.size(0)).float().to(gamma.device)
+                    beta = torch.zeros(gamma.size(0)).float()
+                    if not is_cpu:
+                        beta = beta.cuda()
 
                 # Conv params
                 W = conv_st_dict['weight']
                 if 'bias' in conv_st_dict:
                     bias = conv_st_dict['bias']
                 else:
-                    bias = torch.zeros(W.size(0)).float().to(gamma.device)
+                    bias = torch.zeros(W.size(0)).float()
+                    if not is_cpu:
+                        bias = bias.cuda()
 
                 denom = torch.sqrt(var + eps)
                 b = beta - gamma.mul(mu).div(denom)
@@ -60,10 +64,11 @@ def fuse_bn_sequential(block):
         return stack[0]
 
 
-def fuse_bn_recursively(model):
+def fuse_bn_recursively(model, is_cpu=False):
     for module_name in model._modules:
-        model._modules[module_name] = fuse_bn_sequential(model._modules[module_name])
-        if len(model._modules[module_name]._modules) > 0:
-            fuse_bn_recursively(model._modules[module_name])
+        module = model._modules[module_name]
+        model._modules[module_name] = fuse_bn_sequential(module, is_cpu=is_cpu)
+        if module._modules:
+            fuse_bn_recursively(module, is_cpu=is_cpu)
 
     return model

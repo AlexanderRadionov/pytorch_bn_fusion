@@ -1,6 +1,16 @@
 import torch.nn as nn
 from torchvision.models import resnet as resnet_modules
-from pretrainedmodels.models import senet as senet_modules
+try:
+    from pretrainedmodels.models import senet as senet_modules
+except ImportError:
+    class DummySeNet:
+        def __init__(self):
+            self.SENet = DummySeNet
+            self.SEBottleneck = DummySeNet
+            self.SEResNetBottleneck = DummySeNet
+            self.SEResNeXtBottleneck = DummySeNet
+    senet_modules = DummySeNet()
+
 
 class Net(nn.Module):
     def __init__(self, features, classifer):
@@ -35,7 +45,7 @@ def convert_resnet_family(model, se=False):
         features.append(model.layer0)
 
     for ind in range(1, 5):
-        modules_layer = model._modules[f'layer{ind}']._modules
+        modules_layer = model._modules['layer{0}'.format(ind)]._modules
         new_modules = []
         for block_name in modules_layer:
             b = modules_layer[block_name]
@@ -58,6 +68,18 @@ def convert_resnet_family(model, se=False):
         classifier = model.last_linear
 
     return Net(features, classifier)
+
+
+def convert_resnet_family_recursively(model):
+    for module_name in model._modules:
+        module = model._modules[module_name]
+        if isinstance(module, resnet_modules.ResNet):
+            model._modules[module_name] = convert_resnet_family(module, se=False)
+        elif isinstance(module, senet_modules.SENet):
+            model._modules[module_name] = convert_resnet_family(module, se=True)
+        if module._modules:
+            convert_resnet_family_recursively(module)
+    return model
 
 
 class BasicResnetBlock(nn.Module):
