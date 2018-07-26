@@ -6,8 +6,8 @@ from torchvision import transforms
 import argparse
 from PIL import Image
 import numpy as np
-from bn_fusion import fuse_bn_recursively
-from utils import convert_resnet_family
+from pytorch_bn_fusion.bn_fusion import fuse_bn_recursively
+from pytorch_bn_fusion.utils import convert_resnet_family
 import pretrainedmodels
 import time
 
